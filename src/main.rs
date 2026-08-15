@@ -11,13 +11,27 @@ use smart_leds::{
     hsv::{hsv2rgb, Hsv},
     SmartLedsWrite, RGB8,
 };
-use heapless::Vec;
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
-const LED_COUNT: usize = 80; // 8x10 matrix
-const MATRIX_WIDTH: usize = 8;
+// Seeed Studio 6x10 RGB MATRIX for XIAO: 60 WS2812B LEDs, DIN on D0 (= GPIO0).
+const LED_COUNT: usize = 60;
+const MATRIX_WIDTH: usize = 6;
 const MATRIX_HEIGHT: usize = 10;
+
+/// Perlin noise realistically spans about -0.7..0.7 rather than the full
+/// -1.0..1.0, so normalise with gain and clamp into `lo..=hi`.
+fn map_noise(noise: f32, lo: u8, hi: u8) -> u8 {
+    const GAIN: f32 = 1.4;
+    let t = ((noise * GAIN) + 1.0) * 0.5; // -> roughly 0.0..1.0
+    let t = if t < 0.0 {
+        0.0
+    } else if t > 1.0 {
+        1.0
+    } else {
+        t
+    };
+    lo + (t * (hi - lo) as f32) as u8
+}
 
 #[esp_hal::main]
 fn main() -> ! {
@@ -53,18 +67,19 @@ fn main() -> ! {
                 let noise_y = (y as f32) * 0.3;
                 let noise_z = time_offset;
 
-                let noise_value = perlin_3d(noise_x, noise_y, noise_z);
+                // Two decorrelated noise samples: one drives hue, one drives
+                // value. Sampling the same field for both makes bright pixels
+                // and red pixels the same pixels.
+                let hue_noise = perlin_3d(noise_x, noise_y, noise_z);
+                let val_noise = perlin_3d(noise_x, noise_y, noise_z + 64.0);
 
-                // Map noise (-1.0 to 1.0) to hue (0 to 255)
-                let hue = ((noise_value + 1.0) * 127.5) as u8;
+                // perlin_3d peaks well short of +/-1.0, so apply gain before
+                // mapping into the 0..=255 range.
+                let hue = map_noise(hue_noise, 0, 255);
+                // Keep a floor under val so no cell ever goes fully black.
+                let val = map_noise(val_noise, 96, 255);
 
-                // Create HSV color with full saturation and varying brightness
-                let brightness_val = ((noise_value + 1.0) * 127.5) as u8;
-                let hsv = Hsv {
-                    hue,
-                    sat: 255,
-                    val: brightness_val,
-                };
+                let hsv = Hsv { hue, sat: 255, val };
 
                 let rgb = hsv2rgb(hsv);
 
@@ -75,16 +90,15 @@ fn main() -> ! {
             }
         }
 
-        // Apply gamma correction and brightness limiting
-        let corrected: Vec<RGB8, LED_COUNT> = gamma(brightness(frame_buffer.iter().cloned(), 32)).collect();
-
-        // Write to LEDs
-        led.write(corrected.iter().cloned()).ok();
+        // Gamma correction MUST come before the brightness reduction: applying
+        // it afterwards pushes every channel into the flat 0/1 region of the
+        // gamma table and the whole matrix goes dark.
+        led.write(brightness(gamma(frame_buffer.iter().cloned()), 64)).ok();
 
         // Advance time for animation
-        time_offset += 0.05;
+        time_offset += 0.025;
 
         // Control animation speed
-        delay.delay_millis(50);
+        delay.delay_millis(25);
     }
 }
