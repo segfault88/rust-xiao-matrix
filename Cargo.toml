@@ -1,0 +1,23 @@
+[package]
+name = "rust-xiao-matrix"
+version = "0.1.0"
+edition = "2024"
+resolver = "2"
+
+[dependencies]
+esp-hal = { version = "=1.1.2", features = ["esp32c6", "unstable"] }
+esp-backtrace = { version = "0.19", features = ["esp32c6", "panic-handler", "println"] }
+esp-println = { version = "0.17", default-features = false, features = ["esp32c6", "uart", "log-04", "critical-section"] }
+log = "0.4"
+smart-leds = "0.4"
+esp-hal-smartled2 = { version = "0.29", features = ["esp32c6"] }
+noise_perlin = "1.0"
+heapless = "0.8"
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32c6"] }
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
