@@ -3,14 +3,14 @@
 
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, rmt::Rmt, time::Rate};
-use esp_hal_smartled::{RmtSmartLeds, color_order, buffer_size, WS2812_TIMING};
+use esp_hal_smartled::{RmtSmartLeds, WS2812_TIMING, buffer_size, color_order};
 use log::info;
 use noise_perlin::perlin_3d;
 use smart_leds::{
-    brightness, gamma,
-    hsv::{hsv2rgb, Hsv},
-    SmartLedsWrite, RGB8,
+    RGB8, SmartLedsWrite, brightness, gamma,
+    hsv::{Hsv, hsv2rgb},
 };
+
 esp_bootloader_esp_idf::esp_app_desc!();
 
 // Seeed Studio 6x10 RGB MATRIX for XIAO: 60 WS2812B LEDs, DIN on D0 (= GPIO0).
@@ -93,7 +93,8 @@ fn main() -> ! {
         // Gamma correction MUST come before the brightness reduction: applying
         // it afterwards pushes every channel into the flat 0/1 region of the
         // gamma table and the whole matrix goes dark.
-        led.write(brightness(gamma(frame_buffer.iter().cloned()), 64)).ok();
+        led.write(brightness(gamma(frame_buffer.iter().cloned()), 64))
+            .ok();
 
         // Advance time for animation
         time_offset += 0.025;
