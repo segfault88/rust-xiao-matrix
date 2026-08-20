@@ -97,9 +97,9 @@ fn main() -> ! {
             .ok();
 
         // Advance time for animation
-        time_offset += 0.025;
+        time_offset += 0.01;
 
         // Control animation speed
-        delay.delay_millis(25);
+        delay.delay_millis(10);
     }
 }
